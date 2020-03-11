@@ -2,7 +2,7 @@
 'use strict'
 
 var assert = require('assert')
-var cev = require('../../main/generator')
+var cev = require('../../main')
 
 describe('cev', function () {
   it('should work with nothing', function (done) {

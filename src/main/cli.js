@@ -3,7 +3,7 @@
 
 const stdio = require('stdio')
 const eol = require('os').EOL
-const cev = require('./lib/cev')
+const generator = require('./generator')
 
 const DEFAULT_PRETTY = 2
 const DEFAULT_VERBOSE = false
@@ -18,28 +18,28 @@ const opts = stdio.getopt({
     description: 'Separator.',
     args: 1,
     mandatory: false,
-    default: cev.DEFAULT_SEPARATOR
+    default: generator.DEFAULT_SEPARATOR
   },
   prefix: {
     key: 'p',
     description: 'Prefix; use an at-sign (\'@\') for your application\'s name.',
     args: 1,
     mandatory: false,
-    default: cev.DEFAULT_PREFIX
+    default: generator.DEFAULT_PREFIX
   },
   noprefix: {
     key: 'n',
     description: 'Do not use a prefix; supercedes --prefix.',
     args: 0,
     mandatory: false,
-    default: cev.DEFAULT_NO_PREFIX
+    default: generator.DEFAULT_NO_PREFIX
   },
   casing: {
     key: 'c',
     args: 1,
-    description: 'Casing: "' + cev.CASING_UPPER + '", "' + cev.CASING_LOWER + '", or "' + cev.CASING_UNCHANGED + '".',
+    description: 'Casing: "' + generator.CASING_UPPER + '", "' + generator.CASING_LOWER + '", or "' + generator.CASING_UNCHANGED + '".',
     mandatory: false,
-    default: cev.DEFAULT_CASING
+    default: generator.DEFAULT_CASING
   },
   pretty: {
     key: 'f',
@@ -53,7 +53,7 @@ const opts = stdio.getopt({
     args: 0,
     description: 'If present, preserves sections that wouldn\'t have any environment variables.  Functions are always skipped.',
     mandatory: false,
-    default: cev.DEFAULT_EMPTIES
+    default: generator.DEFAULT_EMPTIES
   },
   verbose: {
     key: 'v',
@@ -68,7 +68,7 @@ if (opts.verbose) {
   errln('Options: ' + JSON.stringify(opts, null, 2))
 }
 
-const vars = cev.generate(require('config'), {
+const vars = generator.generate(require('config'), {
   noPrefix: opts.noprefix,
   prefix: opts.prefix,
   separator: opts.separator,
