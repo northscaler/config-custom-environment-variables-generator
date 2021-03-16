@@ -9,6 +9,8 @@ See [this blog post](http://www.scispike.com/blog/get-rid-of-node-js-config-grun
 It really comes in handy when your configuration starts to get big and you forget to keep
 your `config/custom-environment-variables.json` file in sync with the rest of your configuration.
 
+> NOTE: If you're using TypeScript, make sure `ts-node` is on your `PATH` and that you use `cev-ts` instead of `cev`.
+
 ## Example
 ```
 # cd into a config-based Node.js project...
