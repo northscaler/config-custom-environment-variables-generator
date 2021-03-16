@@ -18,7 +18,7 @@
   },
   "bin": {
     "cev": "cli.js",
-    "cev-ts": "cli-ts.js"
+    "cev-ts": "cli-ts.ts"
   },
   "main": "index.js",
   "scripts": {
