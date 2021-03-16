@@ -17,7 +17,8 @@
     "node": ">=8.6.0"
   },
   "bin": {
-    "cev": "cli.js"
+    "cev": "cli.js",
+    "cev-ts": "cli-ts.js"
   },
   "main": "index.js",
   "scripts": {
