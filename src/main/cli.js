@@ -3,6 +3,7 @@
 
 const stdio = require('stdio')
 const eol = require('os').EOL
+const fs = require('fs')
 const generator = require('./generator')
 
 const DEFAULT_PRETTY = 2
@@ -61,6 +62,11 @@ const opts = stdio.getopt({
     description: 'Be verbose.',
     mandatory: false,
     default: DEFAULT_VERBOSE
+  },
+  _meta_: {
+    minArgs: 0,
+    maxArgs: 1,
+    description: 'File to write to; omit for stdout.'
   }
 })
 
@@ -76,4 +82,15 @@ const vars = generator.generate(require('config'), {
   empties: opts.empties
 })
 
-process.stdout.write(JSON.stringify(vars, null, opts.pretty))
+const json = JSON.stringify(vars, null, opts.pretty)
+
+var file = ''
+if (opts.args) {
+  file = opts.args[0].trim()
+}
+
+if (file) {
+  fs.writeFileSync(file, json)
+} else {
+  process.stdout.write(json)
+}
