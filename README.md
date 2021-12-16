@@ -36,9 +36,14 @@ then the preceding command will generate JSON to stdout suitable for use as your
 }
 ```
 
+The CLI writes to stdout by default.
 To save the output, just direct it to a file:
 
 `$ npx cev > config/custom-environment-variables.json`
+
+... or give the file as the sole positional argument:
+
+`$ npx cev config/custom-environment-variables.json`
 
 ## Prerequisites
 
