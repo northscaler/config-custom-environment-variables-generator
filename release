@@ -32,4 +32,4 @@ for it in release.sh tag-nodejs; do
 done
 
 # Feel free to change this invocation to suit your needs
-"$THIS_ABSPATH/release.sh" --pre-rc $@
+"$THIS_ABSPATH/release.sh" --pre-rc --tech nodejs $@
