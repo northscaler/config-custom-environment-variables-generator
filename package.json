@@ -1,6 +1,6 @@
 {
   "name": "@northscaler/config-custom-environment-variables-generator",
-  "version": "1.3.0-rc.3",
+  "version": "1.3.0",
   "description": "Generator of config/custom-environment-variables.json File for config-Based Projects",
   "repository": {
     "type": "git",
