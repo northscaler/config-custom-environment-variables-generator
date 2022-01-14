@@ -9,7 +9,7 @@ const generator = require('./generator')
 const DEFAULT_PRETTY = 2
 const DEFAULT_VERBOSE = false
 
-var errln = function (text) {
+const errln = function (text) {
   process.stderr.write(text + eol)
 }
 
@@ -84,7 +84,7 @@ const vars = generator.generate(require('config'), {
 
 const json = JSON.stringify(vars, null, opts.pretty)
 
-var file = ''
+let file = ''
 if (opts.args) {
   file = opts.args[0].trim()
 }
