@@ -2,5 +2,6 @@
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 
-"$THIS_ABSPATH/release" nodejs $@
+nvm install
 
+"$THIS_ABSPATH/release" nodejs $@
