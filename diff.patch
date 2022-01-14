@@ -1,0 +1,643 @@
+diff --git a/.gitignore b/.gitignore
+index 34fd397..7337e9c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -304,3 +304,4 @@ $RECYCLE.BIN/
+ 
+ 
+ # End of https://www.gitignore.io/api/node,macos,windows,linux,jetbrains+all,eclipse
++release.sh
+diff --git a/.gitlab-ci.yml b/.gitlab-ci.yml
+index 139aed7..dcf5da8 100644
+--- a/.gitlab-ci.yml
++++ b/.gitlab-ci.yml
+@@ -36,11 +36,12 @@ publish:
+   image: node:12-alpine
+   script:
+     - *authenticate-to-npmjs
++    - npm install
+     - npm run make-distribution
+     - cd lib/main
+     - npm shrinkwrap
+     - export RM_TMP_TAG=cicd-$(date +%s)
+     - npm publish --access public --tag $RM_TMP_TAG
+-    - ../../tag-nodejs
++    - ../../tag-nodejs.sh
+   only:
+     - /^\d+\.\d+\.\d+(\-[^\.]+\.\d+)?$/
+diff --git a/package-lock.json b/package-lock.json
+index 89e606d..380ca3a 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@northscaler/config-custom-environment-variables-generator",
+-  "version": "1.4.0-pre.0",
++  "version": "1.3.2-rc.0",
+   "lockfileVersion": 1,
+   "requires": true,
+   "dependencies": {
+diff --git a/package.json b/package.json
+index a8b9d1b..c6e2f7a 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@northscaler/config-custom-environment-variables-generator",
+-  "version": "1.4.0-pre.0",
++  "version": "1.3.2-rc.0",
+   "description": "Generator of config/custom-environment-variables.json File for config-Based Projects",
+   "repository": {
+     "type": "git",
+diff --git a/rel b/rel
+deleted file mode 100755
+index adb6630..0000000
+--- a/rel
++++ /dev/null
+@@ -1,10 +0,0 @@
+-#!/usr/bin/env bash
+-
+-THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
+-
+-if [ "$(cat .nvmrc)" != "$(node --version)" ]; then
+-  echo "ERROR: use node version $(cat .nvmrc) when releasing!" >&2
+-  exit 1
+-fi
+-
+-"$THIS_ABSPATH/release" nodejs $@
+diff --git a/release b/release
+index ab504ec..ad93282 100755
+--- a/release
++++ b/release
+@@ -1,383 +1,35 @@
+ #!/usr/bin/env bash
+-
+-# MIT License
+-#
+-# Copyright (c) 2018 Northscaler, Inc.
+-#
+-# Permission is hereby granted, free of charge, to any person obtaining a copy
+-# of this software and associated documentation files (the "Software"), to deal
+-# in the Software without restriction, including without limitation the rights
+-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+-# copies of the Software, and to permit persons to whom the Software is
+-# furnished to do so, subject to the following conditions:
+-#
+-# The above copyright notice and this permission notice shall be included in all
+-# copies or substantial portions of the Software.
+-#
+-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+-# SOFTWARE.
+-
+-# This script implements the minor-release-per-branch workflow projects using git for source control.
+-
+-if [ -n "$RELEASE_DEBUG" ]; then
+-  set -x
+-fi
+-
+ set -e
+ 
+-THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
+-
+-ORIGIN=${ORIGIN:-origin}
+-MASTER=${MASTER:-master}
+-TAG_PREFIX=${TAG_PREFIX:-''}
+-TAG_SUFFIX=${TAG_SUFFIX:-''}
+-BRANCH_PREFIX=${BRANCH_PREFIX:-'v'}
+-BRANCH_SUFFIX=${BRANCH_SUFFIX:-''} # '.x' is a common one
+-
+-if [ -z "$NO_GIT_DISCOVERY_ACROSS_FILESYSTEM" ]; then
+-  GIT_DISCOVERY_ACROSS_FILESYSTEM=1 # needed when running in a docker container
+-fi
+-
+-MATCH=match
+-if ! which $MATCH; then
+-  MATCH="docker run --rm -i matthewadams12/$MATCH"
+-fi
+-
+-YMLX=ymlx
+-if ! which $YMLX; then
+-  export YMLX="docker run --rm -i matthewadams12/$YMLX"
+-fi
+-
+-# support custom "pre" tokens
+-PRE=${PRE:-pre}
+-PRE_USAGE=pre
+-if [ "$PRE" != "pre" ]; then
+-  PRE_USAGE="$PRE_USAGE|$PRE"
+-fi
+-
+-# support custom "rc" tokens
+-RC=${RC:-rc}
+-RC_USAGE=rc
+-if [ "$RC" != "rc" ]; then
+-  RC_USAGE="$RC_USAGE|$RC"
+-fi
+-
+-# ensure pre & rc tokens are not the same
+-if [ "$PRE" == "$RC" ]; then
+-  echo "ERROR: PRE ($PRE) cannot be the same as RC ($RC)" >&2
++if [ "$(cat .nvmrc)" != "$(node --version)" ]; then
++  echo "ERROR: use node version $(cat .nvmrc) when releasing!" >&2
+   exit 1
+ fi
+ 
+-# ensure pre token sorts alphabetically before rc token
+-if [ "$PRE" \> "$RC" ]; then
+-  echo "ERROR: PRE ($PRE) cannot sort alphabetically after RC ($RC)" >&2
+-  exit 1
+-fi
+-
+-if [ $# -lt 2 ]; then
+-  echo "Insufficient arguments" >&2
+-  echo "Usage: $0 <technology-type>[+<technology-type2>+[<technology-type3>+...]] <release-level>" >&2
+-  echo "Example 1: $0 nodejs pre # releases via npm using package.json" >&2
+-  echo "Example 2: $0 nodejs+image pre # releases via npm using package.json and versions Dockerfile with it" >&2
+-  exit 1
+-fi
+-
+-TECHNOLOGIES="$(echo "$1" | tr '+' ' ')"
+-
+-# Source technology-specific file(s) for usage_xxx, getVersion_xxx & setVersion_xxx functions
+-for T in $TECHNOLOGIES; do
+-  FUNCTIONS_FILE="$THIS_ABSPATH/release-$T"
+-  if [ -f "$FUNCTIONS_FILE" ]; then
+-    source "$FUNCTIONS_FILE"
+-  else
+-    echo "Unknown technology type: $T" >&2
+-    echo "Usage: $0 <technology-type> <release-level>" >&2
+-    exit 1
+-  fi
+-done
++# Update this value to have this repo use a different version of the release.sh script to release itself
++RM_USE_VERSION=2.1.0
++# Override the version in use if you want to by setting RM_VERSION before invoking this script
++RM_VERSION=${RM_VERSION:-$RM_USE_VERSION} # the git ref of the version of the release-management file you want to get
+ 
+-# usage: setVersions version
+-setVersions() {
+-  for T in $TECHNOLOGIES; do
+-    setVersion_$T $1
+-  done
+-}
+-
+-usages() {
+-  for T in $TECHNOLOGIES; do
+-    usage_$T
+-  done
+-}
+-
+-RELEASE_LEVEL="${@: -1}"
+-
+-case "$RELEASE_LEVEL" in
+-  major|minor|patch|pre|rc|$PRE|$RC)
+-    # ok
+-    ;;
+-  h|he|hel|help)
+-    usages
+-    exit 0
+-    ;;
+-  *)
+-    if [ -n "$2" ]; then
+-      echo "ERROR: specify release level of 'pre' or '$PRE' for prerelease, 'rc' or '$RC' for release candidate, 'patch', 'minor', or 'major'" >&2
+-    fi
+-    usages
+-    exit 1
+-    ;;
+-esac
+-
+-echo "INFO: checking required preconditions"
+-
+-git pull
+-
+-# check that all versions are exactly the same
+-for T in $TECHNOLOGIES; do
+-  V="$(getVersion_$T)"
+-  if [ -n "$V_LAST" ] && [ "$V_LAST" != "$V" ]; then
+-    echo "ERROR: versions among different technology files differ: $T is at $V, but $T_LAST is at $V_LAST" >&2
+-    exit 33
+-  fi
+-  V_LAST="$V"
+-  T_LAST="$T"
+-done
+-
+-if ! git diff --exit-code --no-patch; then
+-  echo 'ERROR: you have modified tracked files; only release from clean directories!' >&2
+-  exit 3
+-else
+-  echo 'INFO: no modified tracked files'
+-fi
+-
+-if ! git diff --cached --exit-code --no-patch; then
+-  echo 'ERROR: you have cached modified tracked files; only release from clean directories!' >&2
+-  exit 3
+-else
+-  echo 'INFO: no cached modified tracked files'
+-fi
+-
+-if [ -n "$(git status -s)" ]; then
+-  echo 'ERROR: You have unignored untracked files; only release from clean directories!' >&2
+-  exit 3
+-else
+-  echo 'INFO: no unignored untracked files'
+-fi
+-
+-BRANCH="$(git status | head -n 1 | awk '{ print $3 }')"
+-if ! $MATCH "^(master|$BRANCH_PREFIX[0-9]{1,}\.[0-9]{1,}$BRANCH_SUFFIX)$" "$BRANCH"; then # it is not a master or a release branch
+-  echo "ERROR: you can only release from the master branch or release branches! You are currently on $BRANCH" >&2
+-  exit 3
+-else
+-  echo "INFO: on branch $BRANCH, from which releases are allowed"
+-fi
++THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
+ 
+-if ! git diff --exit-code -no-patch $BRANCH $ORIGIN/$BRANCH; then
+-  echo "ERROR: Local branch $BRANCH differs from remote branch $ORIGIN/$BRANCH" >&2
+-  exit 3
++# try with curl or wget, else fallback to docker
++if which -s curl; then
++  fetch='curl -s '
++elif which -s wget; then
++  fetch='wget -qO - '
+ else
+-  echo "INFO: no differences between local & remote branch $BRANCH"
+-fi
+-
+-if [ "$BRANCH" = "$MASTER" ]; then
+-  case "$RELEASE_LEVEL" in
+-    pre|rc|$PRE|$RC)
+-      # ok
+-      ;;
+-    *)
+-      echo "ERROR: only 'pre'/'$PRE' or 'rc'/'$RC' releases are permitted from the $MASTER branch." >&2
+-      exit 6
+-      ;;
+-  esac
+-else # this is a release branch
+-  case "$RELEASE_LEVEL" in
+-      rc|patch|minor|major)
+-        # ok
+-        ;;
+-      *)
+-        echo "ERROR: only 'rc'/'$RC', 'patch', 'minor', or 'major' releases are permitted from a release branch." >&2
+-        exit 7
+-        ;;
+-  esac
+-fi
+-
+-echo "INFO: ok to proceed with $RELEASE_LEVEL from branch $BRANCH"
+-
+-VERSION="$V_LAST"
+-
+-if ! $MATCH "\-($PRE|$RC)\.[0-9]{1,}$" "$VERSION"; then
+-  echo "ERROR: repository is in an inconsistent state: version does not end in a prerelease suffix! You are currently on branch $BRANCH" >&2
+-  exit 3
++  fetch='docker run --rm -i rancher/curl -s '
+ fi
+ 
+-# usage: apply message [tag [remote branch]]
+-applyChanges() {
+-  git add .
+-  git commit --allow-empty -m "$1"
+-  echo "INFO: committed changes with message: $1"
+-
+-  MSG="INFO: pushed commits"
+-
+-  if [ -n "$2" ]; then
+-    tag="$TAG_PREFIX$2$TAG_SUFFIX"
+-    git tag "$tag"
+-    echo "INFO: tagged $tag"
+-    MSG="$MSG & tags"
+-  fi
+-
+-  SET_UPSTREAM_ARGS=
+-  if [ -n "$3" ] && [ -n "$4" ]; then
+-    SET_UPSTREAM_ARGS="-u $3 $4"
+-    MSG="$MSG & set tracked upstream to $3/$4"
+-  fi
+-
+-  git push $SET_UPSTREAM_ARGS
+-  git push --tags
+-
+-  echo "$MSG"
++get() {
++  $fetch https://gitlab.com/northscaler-public/release-management/-/raw/$RM_VERSION/$1 >"$THIS_ABSPATH/$1"
+ }
+ 
+-if [ "$BRANCH" = "$MASTER" ]; then # this will be either an rc, resulting in a new release branch, or a pre
+-  MATCHES="$($MATCH "^([0-9]{1,})\.([0-9]{1,})\.0\-$PRE\.([0-9]{1,})$" "$VERSION")"
+-  if [ -z "$MATCHES" ]; then
+-    echo "ERROR: the version does not match the format of major.minor.0-$PRE.n required in the $MASTER branch." >&2
+-    exit 8
+-  else
+-    echo "INFO: version $VERSION matches expected format for branch $BRANCH"
+-  fi
+-
+-  # create release branch
+-  MAJOR="$(echo "$MATCHES" | awk '{ print $2 }')"
+-  MINOR="$(echo "$MATCHES" | awk '{ print $3 }')"
+-  PATCH=0
+-  PRERELEASE="$(echo "$MATCHES" | awk '{ print $4 }')"
+-
+-  case "$RELEASE_LEVEL" in
+-  rc|$RC) # then it's time to create a new release branch
+-      NEW_RELEASE_BRANCH="$BRANCH_PREFIX$MAJOR.$MINOR$BRANCH_SUFFIX"
+-      git checkout -b $NEW_RELEASE_BRANCH
+-
+-      NEW_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.0-$RC.0"
+-
+-      setVersions $NEW_RELEASE_BRANCH_VERSION
+-
+-      applyChanges "release $NEW_RELEASE_BRANCH_VERSION" $NEW_RELEASE_BRANCH_VERSION $ORIGIN $NEW_RELEASE_BRANCH
+-      echo "INFO: created release branch $NEW_RELEASE_BRANCH and tagged $NEW_RELEASE_BRANCH_VERSION for release"
+-
+-      # return to master branch
+-      git checkout $MASTER
+-      echo "INFO: checked out $MASTER"
+-
+-      git cherry-pick $NEW_RELEASE_BRANCH # cherry pick from release branch to get release candidate commit in master
+-      echo "INFO: cherry-picked $NEW_RELEASE_BRANCH $RC commit into $MASTER"
+-
+-      # advance master version
+-      NEXT_VERSION="$MAJOR.$(($MINOR+1)).0-$PRE.0"
+-
+-      setVersions $NEXT_VERSION $DOCKER_BUILD_STEP_NAMES
+-
+-      applyChanges "bump to $NEXT_VERSION [skip ci]"
+-
+-      # return to release branch & prepare for next prerelease
+-      git checkout $NEW_RELEASE_BRANCH
+-      echo "INFO: checked out $NEW_RELEASE_BRANCH"
+-
+-      NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.0-$RC.1"
+-
+-      setVersions $NEXT_RELEASE_BRANCH_VERSION $DOCKER_BUILD_STEP_NAMES
+-
+-      applyChanges "bump to $NEXT_RELEASE_BRANCH_VERSION [skip ci]"
+-
+-      exit 0
+-      ;;
+-
+-  pre|$PRE)
+-      setVersions $VERSION
+-
+-      applyChanges "release $VERSION" $VERSION
+-
+-      NEXT_VERSION=$MAJOR.$MINOR.$PATCH-$PRE.$((PRERELEASE+1))
+-
+-      setVersions $NEXT_VERSION
+-
+-      applyChanges "bump to $NEXT_VERSION [skip ci]"
+-
+-      exit 0
+-      ;;
+-  esac
+-fi
+-
+-# If we get this far, we are releasing something from a release branch.
+-
+-MATCHES="$($MATCH "^([0-9]{1,})\.([0-9]{1,})\.([0-9]{1,})\-$RC\.([0-9]{1,})$" "$VERSION")"
+-if [ -z "$MATCHES" ]; then
+-  echo "ERROR: the version does not match the format of major.minor.patch-$RC.n required in the release branch." >&2
+-  exit 8
+-else
+-  echo "INFO: version $VERSION matches expected format for branch $BRANCH"
+-fi
+-
+-MAJOR="$(echo "$MATCHES" | awk '{ print $2 }')"
+-MINOR="$(echo "$MATCHES" | awk '{ print $3 }')"
+-PATCH="$(echo "$MATCHES" | awk '{ print $4 }')"
+-PRERELEASE="$(echo "$MATCHES" | awk '{ print $5 }')"
+-
+-case "$RELEASE_LEVEL" in
+-  major|minor|patch)
+-
+-    # NOTE: if RELEASE_LEVEL is 'minor' & we're prepped for a major release, no harm, no foul.
+-    # A major release is the same as a minor release, only that the minor version is 0.
+-
+-    if [ $RELEASE_LEVEL = major ] && [ $MINOR != 0 ]; then
+-      echo "ERROR: this branch is not prepared for a major release because the minor version is $MINOR, not 0." >&2
+-      exit 10
+-    else
+-      NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.1-$RC.0"
+-    fi
+-    if [ $RELEASE_LEVEL = minor ] && [ $PATCH != 0 ]; then
+-      echo "ERROR: a minor release has already been performed in this release branch; only patch releases are allowed here now." >&2
+-      exit 11
+-    else
+-      NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.1-$RC.0"
+-    fi
+-    if [ $RELEASE_LEVEL = patch ] && [ $PATCH = 0 ]; then
+-      echo "ERROR: you must release a minor release before releasing a patch in this release branch." >&2
+-      exit 12
+-    else
+-      NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.$((PATCH+1))-$RC.0"
+-    fi
+-
+-    echo "INFO: $RELEASE_LEVEL ok in branch $BRANCH"
+-
+-    RELEASE_VERSION="$MAJOR.$MINOR.$PATCH"
+-
+-    setVersions $RELEASE_VERSION
+-
+-    applyChanges "release $RELEASE_VERSION" $RELEASE_VERSION
+-
+-    setVersions $NEXT_RELEASE_BRANCH_VERSION
+-
+-    applyChanges "bump to $NEXT_RELEASE_BRANCH_VERSION [skip ci]"
+-
+-    exit 0
+-    ;;
+-
+-  rc|$RC)
+-    setVersions $VERSION
+-
+-    applyChanges "release $VERSION" $VERSION
+-
+-    NEXT_RELEASE_BRANCH_VERSION="$MAJOR.$MINOR.$PATCH-$RC.$((PRERELEASE+1))"
+-
+-    setVersions $NEXT_RELEASE_BRANCH_VERSION
+-
+-    applyChanges "bump to $NEXT_RELEASE_BRANCH_VERSION [skip ci]"
++for it in release.sh tag-nodejs.sh; do
++  get $it
++  chmod +x $it
++done
+ 
+-    exit 0
+-    ;;
+-esac
++# Feel free to change this invocation to suit your needs
++"$THIS_ABSPATH/release.sh" --pre-rc --tech nodejs $@
+diff --git a/release-nodejs b/release-nodejs
+deleted file mode 100755
+index 8f07405..0000000
+--- a/release-nodejs
++++ /dev/null
+@@ -1,75 +0,0 @@
+-#!/usr/bin/env bash
+-
+-# MIT License
+-#
+-# Copyright (c) 2018 Northscaler, Inc.
+-#
+-# Permission is hereby granted, free of charge, to any person obtaining a copy
+-# of this software and associated documentation files (the "Software"), to deal
+-# in the Software without restriction, including without limitation the rights
+-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+-# copies of the Software, and to permit persons to whom the Software is
+-# furnished to do so, subject to the following conditions:
+-#
+-# The above copyright notice and this permission notice shall be included in all
+-# copies or substantial portions of the Software.
+-#
+-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+-# SOFTWARE.
+-
+-# This script implements usage(), getVersion() & setVersion() for Node.js projects using npm for package management.
+-
+-usage_nodejs() {
+-    cat<<EOF
+-usage:
+-if on $MASTER branch: release nodejs $PRE_USAGE|$RC_USAGE
+-if on release branch: release nodejs major|minor|patch|$PRE_USAGE
+-
+-optional supported environment variables:
+-
+-variable                            description
+---------                            -----------
+-ORIGIN                              name of git remote, default 'origin'
+-MASTER                              name of master branch, default 'master'
+-TAG_PREFIX                          prefix for tags, default ''
+-TAG_SUFFIX                          suffix for tags, default ''
+-BRANCH_PREFIX                       prefix for release branches, default 'v' ('' is common)
+-BRANCH_SUFFIX                       suffix for release branches, default '' ('.x' is common)
+-NO_GIT_DISCOVERY_ACROSS_FILESYSTEM  whether to not set GIT_DISCOVERY_ACROSS_FILESYSTEMS, default ''
+-PACKAGE_JSON                        name of version file, default 'package.json'
+-EOF
+-}
+-
+-PACKAGE_JSON="${PACKAGE_JSON:-package.json}"
+-echo "INFO: using project file: $PACKAGE_JSON"
+-
+-FX_nodejs=fx
+-if [ -n "$NO_USE_LOCAL_FX" ] || ! which $FX_nodejs; then
+-  FX_nodejs="docker run --rm -v "$(pwd)"/$PACKAGE_JSON:/$PACKAGE_JSON scispike/fx:latest $PACKAGE_JSON"
+-fi
+-
+-getVersion_nodejs() {
+-  cat "$PACKAGE_JSON" | $FX_nodejs this.version | sed 's/"//g'
+-}
+-
+-# usage: setVersion version
+-setVersion_nodejs() {
+-  V=$1
+-  VERSION_FILE_CONTENT="$(cat $PACKAGE_JSON | $FX_nodejs "it => { it.version = \"$V\"; return it; }")"
+-  echo "$VERSION_FILE_CONTENT" | sed 's|\\|\\\\|g' > $PACKAGE_JSON
+-  echo "INFO: set 'version' attribute in $PACKAGE_JSON to $V"
+-  echo "$PACKAGE_JSON is now:"
+-  cat "$PACKAGE_JSON"
+-  echo "INFO: running npm install to update package-lock.json"
+-  if [ -f /.dockerenv ]; then
+-    NODE_MODULES_WORKDIR=/tmp/node-work
+-    mkdir -p $NODE_MODULES_WORKDIR
+-    PREFIX_ARG="--prefix $NODE_MODULES_WORKDIR"
+-  fi
+-  npm install $PREFIX_ARG
+-}
+diff --git a/tag-nodejs b/tag-nodejs.sh
+similarity index 63%
+rename from tag-nodejs
+rename to tag-nodejs.sh
+index f5f2841..7c77e76 100755
+--- a/tag-nodejs
++++ b/tag-nodejs.sh
+@@ -1,9 +1,11 @@
++set -e
++
+ #####
+ # This script takes care of proper tag management for npm packages, including stable, next & latest tags.
+ # Typically, you'll have tags called `latest`, `stable-1.0`, `stable-1.1`, ..., `next-1.1`, `next-1.2`, ...
+ # Run `npm dist-tag ls @northscaler/string-support` for an example.
+ #
+-# NB: The 'RM' prefix stands for "Release Management".
++# NB: The 'RM_' prefix stands for "Release Management".
+ #
+ # This script is intended to run immediately after publishing to npm with a temporary tag with an invocation similar to:
+ # $ export RM_TMP_TAG=cicd-$(date +%s)
+@@ -19,6 +21,7 @@ RM_NEXT=${RM_NEXT:-next}
+ 
+ RM_LATEST=${RM_LATEST:-latest}
+ RM_TMP_TAG=${RM_TMP_TAG:-$RM_LATEST}
++RM_KEEP_TMP_TAG=${RM_KEEP_TMP_TAG} # set to 1 to avoid deletion of tag RM_TMP_TAG
+ ##### End configurable environment variables
+ 
+ echo "RM_PKG_JSON=$RM_PKG_JSON"
+@@ -30,7 +33,13 @@ echo "RM_TMP_TAG=$RM_TMP_TAG"
+ RM_PKG_NAME=$(node -e "process.stdout.write(require('$RM_PKG_JSON').name)")
+ RM_PKG_VERSION=$(node -e "process.stdout.write(require('$RM_PKG_JSON').version)")
+ RM_PKG_MINOR_VERSION=$(echo -n "$RM_PKG_VERSION" | egrep -o '^\d+\.\d+')
+-RM_GREATEST_MINOR_STABLE_VERSION=$(RM_DIST_TAGS="$(npm show --json $RM_PKG_NAME dist-tags 2>/dev/null)" \
++export RM_DIST_TAGS="$(npm show --json $RM_PKG_NAME dist-tags 2>/dev/null)"
++RM_PKG_PUBLISHED="$(node -e "const x=JSON.parse(process.env.RM_DIST_TAGS);console.log(!(x && x.error))")" # "true" if published
++echo "RM_PKG_PUBLISHED=$RM_PKG_PUBLISHED"
++if [ "$RM_PKG_PUBLISHED" == true ]; then
++  export RM_PKG_PUBLISHED_VERSIONS="$(npm show --json $RM_PKG_NAME versions)"
++fi
++RM_GREATEST_MINOR_STABLE_VERSION=$(\
+   node -e "console.log(Object.keys(JSON.parse(process.env.RM_DIST_TAGS)).filter(it=>it.startsWith('$RM_STABLE')).map(it=>/\d+\.\d+$/.exec(it)).join('\n'))" |
+   sort -t . -k 1,1n -k 2,2n | tail -1)
+ 
+@@ -51,12 +60,13 @@ CMD="npm dist-tag add $RM_PKG_NAME@$RM_PKG_VERSION $RM_TAG"
+ echo "$CMD"
+ $CMD
+ 
++LATEST_CMD="npm dist-tag add $RM_PKG_NAME@$RM_PKG_VERSION $RM_LATEST" # cmd to add "latest" tag
++
+ if [ "$RM_TAG_PREFIX" == "$RM_STABLE" ]; then # this is a stable release
+   RM_VERSIONS="$RM_GREATEST_MINOR_STABLE_VERSION.0 $RM_PKG_MINOR_VERSION.0"
+   if [ "$RM_VERSIONS" == "$(npx -q semver $RM_VERSIONS | tr '\n' ' ' | xargs)" ]; then # we've published the latest version
+-    CMD="npm dist-tag add $RM_PKG_NAME@$RM_PKG_VERSION $RM_LATEST" # now add "latest" tag
+-    echo "$CMD"
+-    $CMD
++    echo "$LATEST_CMD"
++    $LATEST_CMD
+   fi
+ 
+   if npm dist-tag ls | egrep -q "^$RM_NEXT-$RM_PKG_MINOR_VERSION:"; then # if a "next-x.y" tag exists, rm it
+@@ -66,8 +76,23 @@ if [ "$RM_TAG_PREFIX" == "$RM_STABLE" ]; then # this is a stable release
+   fi
+ fi
+ 
+-if npm dist-tag ls | egrep -q "^$RM_TMP_TAG:"; then # try to rm temporary tag if present
+-  set +e
++if [ "$RM_TAG_PREFIX" == "$RM_NEXT" ]; then # this is a next-x.y release
++  if [ "$RM_PKG_PUBLISHED" == true ]; then # ...of something that's been published before
++    # check to see if there's a GA release
++    RM_GA_RELEASE_EXISTS="$(node -e "console.log(JSON.parse(process.env.RM_PKG_PUBLISHED_VERSIONS).some(v=>v.match(/^\d+\.\d+\.\d+$/)))")" # "true" if there's a GA release
++    echo "RM_GA_RELEASE_EXISTS=$RM_GA_RELEASE_EXISTS"
++    if [ "$RM_GA_RELEASE_EXISTS" != true ]; then # if not, then update latest tag
++      echo "$LATEST_CMD"
++      $LATEST_CMD
++    fi
++  else # ...of something that's never been published
++    echo "$LATEST_CMD"
++    $LATEST_CMD
++  fi
++fi
++
++
++if [ -z "$RM_KEEP_TMP_TAG" ] && npm dist-tag ls 2> /dev/null | egrep -q "^$RM_TMP_TAG:"; then # try to rm temporary tag if present
+   CMD="npm dist-tag rm $RM_PKG_NAME $RM_TMP_TAG"
+   echo "$CMD"
+   $CMD
