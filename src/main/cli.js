@@ -82,7 +82,7 @@ const vars = generator.generate(require('config'), {
   empties: opts.empties
 })
 
-const json = JSON.stringify(vars, null, opts.pretty)
+const json = JSON.stringify(vars, null, parseInt(opts.pretty))
 
 let file = ''
 if (opts.args) {
