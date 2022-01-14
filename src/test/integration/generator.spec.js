@@ -1,8 +1,8 @@
 /* global describe,it */
 'use strict'
 
-var assert = require('assert')
-var cev = require('../../main')
+const assert = require('assert')
+const cev = require('../../main')
 
 describe('cev', function () {
   it('should work with nothing', function (done) {
@@ -10,73 +10,73 @@ describe('cev', function () {
     done()
   })
   it('should work with no prefix specified', function (done) {
-    var opts = {
+    const opts = {
       noPrefix: true,
       prefix: 'GOO'
     }
-    var obj = {
+    const obj = {
       foo: 1,
       bar: {
         sna: 1,
         fu: 2
       }
     }
-    var expected = {
+    const expected = {
       foo: 'FOO',
       bar: {
         sna: 'BAR_SNA',
         fu: 'BAR_FU'
       }
     }
-    var actual = cev(obj, opts)
+    const actual = cev(obj, opts)
     assert.deepStrictEqual(actual, expected)
     done()
   })
   it('should work with a flat object with defaults', function (done) {
-    var obj = {
+    const obj = {
       foo: 1
     }
-    var expected = {
+    const expected = {
       foo: 'NODE_APP_FOO'
     }
-    var actual = cev(obj)
+    const actual = cev(obj)
     assert.deepStrictEqual(actual, expected)
     done()
   })
   it('should work with a flat object with a function and defaults', function (done) {
-    var obj = {
+    const obj = {
       foo: function () {
       }
     }
-    var expected = {}
-    var actual = cev(obj)
+    const expected = {}
+    const actual = cev(obj)
     assert.deepStrictEqual(actual, expected)
     done()
   })
   it('should work with a deep object with a function and defaults', function (done) {
-    var obj = {
+    const obj = {
       foo: {
         bar: function () {
         }
       }
     }
-    var expected = {}
-    var actual = cev(obj)
+    const expected = {}
+    const actual = cev(obj)
     assert.deepStrictEqual(actual, expected)
     done()
   })
   it('should work with a flat object with non-defaults', function (done) {
-    var prefix = 'PRE'
-    var separator = '_'
-    var casing = cev.CASING_UPPER
-    var empties = true
-    var obj = {
+    const prefix = 'PRE'
+    const separator = '_'
+    const casing = cev.CASING_UPPER
+    const empties = true
+    const obj = {
       foo: 1
     }
-    var expected = {
+    const expected = {
       foo: prefix + separator + 'FOO'
     }
-    var actual = cev(obj, {
+    const actual = cev(obj, {
       prefix: prefix,
       separator: separator,
       casing: casing,
@@ -86,28 +86,28 @@ describe('cev', function () {
     done()
   })
   it('should work with a deep object with defaults', function (done) {
-    var obj = {
+    const obj = {
       foo: 1,
       bar: {
         goo: 1
       }
     }
-    var expected = {
+    const expected = {
       foo: 'NODE_APP_FOO',
       bar: {
         goo: 'NODE_APP_BAR_GOO'
       }
     }
-    var actual = cev(obj)
+    const actual = cev(obj)
     assert.deepStrictEqual(actual, expected)
     done()
   })
   it('should work with a deep object with non-defaults', function (done) {
-    var prefix = 'PRE'
-    var separator = '_'
-    var casing = cev.CASING_UPPER
-    var empties = true
-    var obj = {
+    const prefix = 'PRE'
+    const separator = '_'
+    const casing = cev.CASING_UPPER
+    const empties = true
+    const obj = {
       foo: 1,
       bar: {
         goo: 1,
@@ -116,14 +116,14 @@ describe('cev', function () {
       loo: function () {
       }
     }
-    var expected = {
+    const expected = {
       foo: prefix + separator + 'FOO',
       bar: {
         goo: prefix + separator + 'BAR' + separator + 'GOO',
         hoo: {}
       }
     }
-    var actual = cev(obj, {
+    const actual = cev(obj, {
       prefix: prefix,
       separator: separator,
       casing: casing,
