@@ -4,6 +4,7 @@
 const stdio = require('stdio')
 const eol = require('os').EOL
 const fs = require('fs')
+const os = require('os')
 const generator = require('./generator')
 
 const DEFAULT_PRETTY = 2
@@ -82,7 +83,13 @@ const vars = generator.generate(require('config'), {
   empties: opts.empties
 })
 
-const json = JSON.stringify(vars, null, opts.pretty)
+let indentation = parseInt(opts.pretty)
+if (isNaN(indentation)) {
+  process.stderr.write(`WARN: could not parse '--pretty ${opts.pretty}'; reverting to ${DEFAULT_PRETTY}${os.EOL}`)
+  indentation = DEFAULT_PRETTY
+}
+
+const json = JSON.stringify(vars, null, indentation)
 
 let file = ''
 if (opts.args) {
