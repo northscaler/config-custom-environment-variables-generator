@@ -42,6 +42,6 @@ publish:
     - npm shrinkwrap
     - export RM_TMP_TAG=cicd-$(date +%s)
     - npm publish --access public --tag $RM_TMP_TAG
-    - ../../tag-nodejs
+    - ../../tag-nodejs.sh
   only:
     - /^\d+\.\d+\.\d+(\-[^\.]+\.\d+)?$/
