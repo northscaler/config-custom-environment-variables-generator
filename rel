@@ -2,6 +2,9 @@
 
 THIS_ABSPATH="$(cd "$(dirname "$0")"; pwd)"
 
-nvm install
+if [ "$(cat .nvmrc)" != "$(node --version)" ]; then
+  echo "ERROR: use node version $(cat .nvmrc) when releasing!" >&2
+  exit 1
+fi
 
 "$THIS_ABSPATH/release" nodejs $@

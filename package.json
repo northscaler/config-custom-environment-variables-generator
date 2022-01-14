@@ -13,9 +13,6 @@
     "generator"
   ],
   "license": "MIT",
-  "engines": {
-    "node": ">=8.6.0"
-  },
   "bin": {
     "cev": "cli.js",
     "cev-ts": "cli-ts.ts"
