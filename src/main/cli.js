@@ -6,7 +6,7 @@ const eol = require('os').EOL
 const fs = require('fs')
 const os = require('os')
 const generator = require('./generator')
-const { DEFAULT_USE_FORMAT_KEY, DEFAULT_FORMAT_KEY } = require('./generator')
+const { parseFormats } = require('./cli-support')
 
 const DEFAULT_PRETTY = 2
 const DEFAULT_VERBOSE = false
@@ -65,19 +65,12 @@ const opts = stdio.getopt({
     mandatory: false,
     default: DEFAULT_VERBOSE
   },
-  useFormat: {
-    key: 'u',
-    args: 0,
-    description: 'Use a format key.',
-    mandatory: false,
-    default: DEFAULT_USE_FORMAT_KEY
-  },
   formatKey: {
     key: 'k',
+    description: '(multiple allowed) give in the form "path.to.key=format", where format is one of the allowed config __format values',
     args: 1,
-    description: 'Format key.',
-    mandatory: false,
-    default: DEFAULT_FORMAT_KEY
+    multiple: true,
+    required: false
   },
   _meta_: {
     minArgs: 0,
@@ -95,7 +88,8 @@ const vars = generator.generate(require('config'), {
   prefix: opts.prefix,
   separator: opts.separator,
   casing: opts.casing,
-  empties: opts.empties
+  empties: opts.empties,
+  formats: parseFormats(opts.format)
 })
 
 let indentation = parseInt(opts.pretty)

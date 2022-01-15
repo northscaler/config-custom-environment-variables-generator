@@ -52,6 +52,7 @@
   "dependencies": {
     "@babel/polyfill": "7.12.1",
     "config": "3.3.7",
+    "lodash.set": "4.3.2",
     "mkdirp": "1.0.4",
     "stdio": "2.1.1"
   },

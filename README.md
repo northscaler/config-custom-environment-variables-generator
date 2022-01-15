@@ -36,6 +36,22 @@ then the preceding command will generate JSON to stdout suitable for use as your
 }
 ```
 
+In order to support the new `__format` feature, see the following example.
+If your project's configuration is
+```
+{
+  "foo": {
+    "bar": 1,
+    "goo": 2
+  },
+  "snafu": "something"
+}
+```
+then the following command will cause your configuration's `foo.bar` value to use format `json` and `foo.goo` to use `number`:
+```
+npx cev -k foo.bar=json -k foo.goo=number
+```
+
 The CLI writes to stdout by default.
 To save the output, just direct it to a file:
 

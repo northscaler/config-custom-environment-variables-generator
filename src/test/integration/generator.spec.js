@@ -134,14 +134,11 @@ describe('cev', function () {
   })
   it('should work with __format feature', function (done) {
     const obj = {
-      foo: {
-        __format: 'json'
-      },
+      foo: 1,
       bar: {
-        goo: {
-          __format: 'number'
-        }
-      }
+        goo: 2
+      },
+      snafu: 3
     }
     const expected = {
       foo: {
@@ -153,36 +150,18 @@ describe('cev', function () {
           __name: 'NODE_APP_BAR_GOO',
           __format: 'number'
         }
-      }
-    }
-    const actual = cev(obj, { useFormat: true })
-    assert.deepStrictEqual(actual, expected)
-    done()
-  })
-  it('should work with __format feature using custom format key', function (done) {
-    const obj = {
-      foo: {
-        __foobar: 'json'
       },
-      bar: {
-        goo: {
-          __foobar: 'number'
+      snafu: 'NODE_APP_SNAFU'
+    }
+    const actual = cev(obj, {
+      useFormat: true,
+      formats: {
+        foo: 'json',
+        bar: {
+          goo: 'number'
         }
       }
-    }
-    const expected = {
-      foo: {
-        __name: 'NODE_APP_FOO',
-        __foobar: 'json'
-      },
-      bar: {
-        goo: {
-          __name: 'NODE_APP_BAR_GOO',
-          __foobar: 'number'
-        }
-      }
-    }
-    const actual = cev(obj, { useFormat: true, formatKey: '__foobar' })
+    })
     assert.deepStrictEqual(actual, expected)
     done()
   })

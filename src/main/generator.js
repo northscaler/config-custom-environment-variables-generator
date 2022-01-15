@@ -11,8 +11,6 @@ const CASING_LOWER = 'lower'
 const CASING_UNCHANGED = 'unchanged'
 const DEFAULT_CASING = CASING_UPPER
 const DEFAULT_EMPTIES = false
-const DEFAULT_FORMAT_KEY = '__format'
-const DEFAULT_USE_FORMAT_KEY = false
 
 /**
  * Generates an object suitable for use with [config](https://npmjs.com/package/config)'s `config/custom-environment-variables.json`, skipping any functions encountered in the given object.
@@ -24,18 +22,18 @@ const DEFAULT_USE_FORMAT_KEY = false
  *   fs.writeFileSync('config/custom-environment-variables.json', JSON.stringify(cev.generate(config, { prefix: 'MYAPP' }), null, 2)));
  * ```
  * @param {object} obj An object, most likely the one returned by `require('config')`.
- * @param {{useFormat: boolean}} [opts] An object containing options to control how the returned object generates environment variable names, containing the following properties.
  * @param {string} [opts.prefix='NODE_APP'] Prefix to use on environment variables.  Use `@` to use the name of your application (see exported `DEFAULT_PREFIX`).
  * @param {boolean} [opts.noPrefix=false] Overrides use of any prefix (see exported `DEFAULT_NO_PREFIX`).
  * @param {separator} [opts.separator='_'] The word separator in environment variables (see exported `DEFAULT_SEPARATOR`).
  * @param {'upper'|'lower'|undefined} [opts.casing='upper'] The case to use.  `upper` forces upper case, `lower` forces lower case, else case is unchanged (see exported `DEFAULT_CASING`, `CASING_UPPER`, `CASING_LOWER`, and `CASING_UNCHANGED`).
  * @param {boolean} [opts.empties=false] If `true`, preserves empty objects that didn't have any environment variables, else skips entries that wouldn't have any environment variables (functions are always skipped).
+ * @param {object} [opts.formats={}] If given, must be an object that specifies the __format value for the corresponding key of the first argument,
  * @returns {object} An object containing the generated environment variables for each key in the input object.
  */
 const generate = function generate (obj, opts) {
   obj = obj || {}
   opts = opts || {}
-  opts.formatKey = opts.formatKey || DEFAULT_FORMAT_KEY
+  opts.formats = opts.formats || {}
 
   let prefix = ''
   const noPrefix = opts.noPrefix
@@ -59,29 +57,29 @@ const generate = function generate (obj, opts) {
   Object.keys(obj).forEach(function (key) {
     if ((obj[key] instanceof Function)) {
       return null // skip
-    } else if (obj[key] instanceof Object) { // maybe recurse
-      const keys = Object.keys(obj[key])
-      if (opts.useFormat && keys.length === 1 && keys[0] === opts.formatKey) {
-        const v = applyCasing((prefix ? prefix + separator : '') + key, casing)
-        vars[key] = {
-          __name: v,
-          [opts.formatKey]: obj[key][opts.formatKey]
-        }
-      } else {
-        const pre = applyCasing((prefix ? (prefix + separator) : '') + key, casing)
-        vars[key] = generate(obj[key], {
-          prefix: pre,
-          separator: separator,
-          casing: casing,
-          empties: empties,
-          useFormat: opts.useFormat,
-          formatKey: opts.formatKey
-        })
-        if ((!Object.keys(vars[key]).length) && !empties) delete vars[key]
-      }
+    }
+
+    if (obj[key] instanceof Object) { // recurse
+      const pre = applyCasing((prefix ? (prefix + separator) : '') + key, casing)
+      vars[key] = generate(obj[key], {
+        prefix: pre,
+        separator: separator,
+        casing: casing,
+        empties: empties,
+        formats: opts.formats[key]
+      })
+      if ((!Object.keys(vars[key]).length) && !empties) delete vars[key]
     } else { // add
       const v = applyCasing((prefix ? prefix + separator : '') + key, casing)
-      vars[key] = v
+      // support __format feature
+      if (opts.formats[key]) {
+        vars[key] = {
+          __name: v,
+          __format: opts.formats[key]
+        }
+      } else {
+        vars[key] = v
+      }
     }
   })
   return vars
@@ -109,5 +107,3 @@ module.exports.DEFAULT_CASING = DEFAULT_CASING
 module.exports.CASING_UPPER = CASING_UPPER
 module.exports.CASING_LOWER = CASING_LOWER
 module.exports.CASING_UNCHANGED = CASING_UNCHANGED
-module.exports.DEFAULT_FORMAT_KEY = DEFAULT_FORMAT_KEY
-module.exports.DEFAULT_USE_FORMAT_KEY = DEFAULT_USE_FORMAT_KEY
