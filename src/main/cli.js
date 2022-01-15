@@ -65,10 +65,10 @@ const opts = stdio.getopt({
     mandatory: false,
     default: DEFAULT_VERBOSE
   },
-  formatKey: {
+  'format-key': {
     key: 'k',
     description: '(multiple allowed) give in the form "path.to.key=format", where format is one of the allowed config __format values',
-    args: 1,
+    args: '*',
     multiple: true,
     required: false
   },
@@ -83,13 +83,16 @@ if (opts.verbose) {
   errln('Options: ' + JSON.stringify(opts, null, 2))
 }
 
+let formats = opts['format-key'] || []
+if (!Array.isArray(formats)) formats = [formats]
+
 const vars = generator.generate(require('config'), {
   noPrefix: opts.noprefix,
   prefix: opts.prefix,
   separator: opts.separator,
   casing: opts.casing,
   empties: opts.empties,
-  formats: parseFormats(opts.format)
+  formats: parseFormats(formats)
 })
 
 let indentation = parseInt(opts.pretty)

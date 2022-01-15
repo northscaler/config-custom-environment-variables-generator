@@ -36,7 +36,7 @@ then the preceding command will generate JSON to stdout suitable for use as your
 }
 ```
 
-In order to support the new `__format` feature, see the following example.
+In order to support `config`'s `__format` feature, see the following example.
 If your project's configuration is
 ```
 {
