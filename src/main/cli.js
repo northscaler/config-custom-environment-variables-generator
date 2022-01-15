@@ -6,6 +6,7 @@ const eol = require('os').EOL
 const fs = require('fs')
 const os = require('os')
 const generator = require('./generator')
+const { DEFAULT_USE_FORMAT_KEY, DEFAULT_FORMAT_KEY } = require('./generator')
 
 const DEFAULT_PRETTY = 2
 const DEFAULT_VERBOSE = false
@@ -63,6 +64,20 @@ const opts = stdio.getopt({
     description: 'Be verbose.',
     mandatory: false,
     default: DEFAULT_VERBOSE
+  },
+  useFormat: {
+    key: 'u',
+    args: 0,
+    description: 'Use a format key.',
+    mandatory: false,
+    default: DEFAULT_USE_FORMAT_KEY
+  },
+  formatKey: {
+    key: 'k',
+    args: 1,
+    description: 'Format key.',
+    mandatory: false,
+    default: DEFAULT_FORMAT_KEY
   },
   _meta_: {
     minArgs: 0,
